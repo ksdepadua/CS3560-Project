@@ -1,5 +1,5 @@
-import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * The Vision class examines neighboring squares on the map
@@ -23,6 +23,7 @@ public abstract class Vision {
 
     /**
      * Updates the player's current position.
+     * The Player calls this after every move.
      *
      * @param row the player's current row
      * @param col the player's current column
@@ -39,6 +40,8 @@ public abstract class Vision {
      * @return list of visible [row, col] coordinate pairs
      */
     protected abstract List<int[]> getVisibleSquares();
+
+    // ---------- Neighbor checks ----------
 
     /**
      * Checks the square to the north of the player.
@@ -92,6 +95,8 @@ public abstract class Vision {
         return null;
     }
 
+    // ---------- Closest searches ----------
+
     /**
      * Finds the path to the closest square with a food bonus.
      * Ties broken by lowest movement cost, then furthest east.
@@ -99,7 +104,7 @@ public abstract class Vision {
      * @return path to closest food, or null if none found
      */
     public Path closestFood() {
-        return findClosest("food", false);
+        return findClosest(sq -> hasAvailable(sq, FoodBonus.class), false);
     }
 
     /**
@@ -108,7 +113,7 @@ public abstract class Vision {
      * @return path to closest water, or null if none found
      */
     public Path closestWater() {
-        return findClosest("water", false);
+        return findClosest(sq -> hasAvailable(sq, WaterBonus.class), false);
     }
 
     /**
@@ -117,7 +122,7 @@ public abstract class Vision {
      * @return path to closest gold, or null if none found
      */
     public Path closestGold() {
-        return findClosest("gold", false);
+        return findClosest(sq -> hasAvailable(sq, GoldBonus.class), false);
     }
 
     /**
@@ -126,7 +131,43 @@ public abstract class Vision {
      * @return path to closest trader, or null if none found
      */
     public Path closestTrader() {
-        return findClosestTrader(false);
+        return findClosest(Square::hasTrader, false);
+    }
+
+    /**
+     * Finds the second closest square with a food bonus.
+     *
+     * @return path to second closest food, or null
+     */
+    public Path secondClosestFood() {
+        return findClosest(sq -> hasAvailable(sq, FoodBonus.class), true);
+    }
+
+    /**
+     * Finds the second closest square with a water bonus.
+     *
+     * @return path to second closest water, or null
+     */
+    public Path secondClosestWater() {
+        return findClosest(sq -> hasAvailable(sq, WaterBonus.class), true);
+    }
+
+    /**
+     * Finds the second closest square with a gold bonus.
+     *
+     * @return path to second closest gold, or null
+     */
+    public Path secondClosestGold() {
+        return findClosest(sq -> hasAvailable(sq, GoldBonus.class), true);
+    }
+
+    /**
+     * Finds the second closest square with a trader.
+     *
+     * @return path to second closest trader, or null
+     */
+    public Path secondClosestTrader() {
+        return findClosest(Square::hasTrader, true);
     }
 
     /**
@@ -135,13 +176,15 @@ public abstract class Vision {
      * @return path to easiest square
      */
     public Path easiestPath() {
-        List<int[]> visible = getVisibleSquares();
         Path best = null;
         int lowestCost = Integer.MAX_VALUE;
 
-        for (int[] coord : visible) {
+        for (int[] coord : getVisibleSquares()) {
             int r = coord[0], c = coord[1];
             Square sq = map.getSquare(c, r);
+            if (sq == null) {
+                continue;
+            }
             int cost = sq.getTerrain().getMovementCost();
             if (cost < lowestCost) {
                 lowestCost = cost;
@@ -151,111 +194,73 @@ public abstract class Vision {
         return best;
     }
 
+    // ---------- Search helpers ----------
+
     /**
-     * Finds the second closest square with a food bonus.
+     * Returns true if the square holds an untaken item of the given type.
+     * Uses the item's class (FoodBonus, WaterBonus, GoldBonus), so Item
+     * does not need a bonus-type field.
      *
-     * @return path to second closest food, or null
+     * @param sq   the square to check
+     * @param type the bonus class to look for
+     * @return true if an available item of that type is there
      */
-    public Path secondClosestFood() {
-        return findClosest("food", true);
+    private boolean hasAvailable(Square sq, Class<? extends Item> type) {
+        for (Item item : sq.getItems()) {
+            if (type.isInstance(item) && !item.isTaken()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
-     * Finds the second closest square with a water bonus.
+     * Finds the closest (or second closest) visible square that
+     * matches the given test. Used for bonuses and traders alike.
      *
-     * @return path to second closest water, or null
-     */
-    public Path secondClosestWater() {
-        return findClosest("water", true);
-    }
-
-    /**
-     * Finds the second closest square with a gold bonus.
-     *
-     * @return path to second closest gold, or null
-     */
-    public Path secondClosestGold() {
-        return findClosest("gold", true);
-    }
-
-    /**
-     * Finds the second closest square with a trader.
-     *
-     * @return path to second closest trader, or null
-     */
-    public Path secondClosestTrader() {
-        return findClosestTrader(true);
-    }
-
-    /**
-     * Finds the closest (or second closest) visible square
-     * containing an item of the given bonus type.
-     *
-     * @param bonusType  the type of bonus to search for
+     * @param matches    test a square must pass
      * @param secondBest if true, returns the second best option
      * @return the best or second best path, or null
      */
-    private Path findClosest(String bonusType, boolean secondBest) {
-        List<int[]> visible = getVisibleSquares();
-        Path best   = null;
+    private Path findClosest(Predicate<Square> matches, boolean secondBest) {
+        Path best = null;
         Path second = null;
+        int bestCol = -1;
+        int secondCol = -1;
 
-        for (int[] coord : visible) {
+        for (int[] coord : getVisibleSquares()) {
             int r = coord[0], c = coord[1];
             Square sq = map.getSquare(c, r);
+            if (sq == null || !matches.test(sq)) {
+                continue;
+            }
 
-            boolean hasBonus = sq.getItems().stream().anyMatch(
-                item -> item.getBonusType().equals(bonusType)
-                     && !item.isTaken()
-            );
-
-            if (hasBonus) {
-                Path p = buildPath(r, c);
-                if (best == null) {
-                    best = p;
-                } else if (
-                    p.getTotalMovementCost()
-                        < best.getTotalMovementCost()
-                    || (p.getTotalMovementCost()
-                        == best.getTotalMovementCost()
-                        && c > playerCol)
-                ) {
-                    second = best;
-                    best   = p;
-                } else if (second == null) {
-                    second = p;
-                }
+            Path p = buildPath(r, c);
+            if (isBetter(p, c, best, bestCol)) {
+                second = best;
+                secondCol = bestCol;
+                best = p;
+                bestCol = c;
+            } else if (isBetter(p, c, second, secondCol)) {
+                second = p;
+                secondCol = c;
             }
         }
         return secondBest ? second : best;
     }
 
     /**
-     * Finds the closest (or second closest) visible square
-     * that contains a trader.
-     *
-     * @param secondBest if true, returns the second best option
-     * @return best or second best path to a trader, or null
+     * Returns true if path p is better than other:
+     * lower movement cost first, then further east.
      */
-    private Path findClosestTrader(boolean secondBest) {
-        List<int[]> visible = getVisibleSquares();
-        Path best   = null;
-        Path second = null;
-
-        for (int[] coord : visible) {
-            int r = coord[0], c = coord[1];
-            Square sq = map.getSquare(c, r);
-            if (sq.hasTrader()) {
-                Path p = buildPath(r, c);
-                if (best == null) {
-                    best = p;
-                } else {
-                    second = best;
-                    best   = p;
-                }
-            }
+    private boolean isBetter(Path p, int col, Path other, int otherCol) {
+        if (other == null) {
+            return true;
         }
-        return secondBest ? second : best;
+        if (p.getTotalMovementCost() != other.getTotalMovementCost()) {
+            return p.getTotalMovementCost() < other.getTotalMovementCost();
+        }
+        return col > otherCol;
     }
 
     /**
@@ -273,7 +278,7 @@ public abstract class Vision {
         int c = playerCol;
 
         while (r != targetRow || c != targetCol) {
-            Direction dir  = null;
+            Direction dir = null;
             int nextR = r, nextC = c;
 
             if (r > targetRow && c < targetCol) {
@@ -294,7 +299,9 @@ public abstract class Vision {
                 dir = Direction.EAST;  nextC++;
             }
 
-            if (dir == null) break;
+            if (dir == null) {
+                break;
+            }
 
             Square next = map.getSquare(nextC, nextR);
             path.addMove(

@@ -13,10 +13,8 @@ public class WaterBonus extends Item {
      * @param position  the square this item is in
      * @param amount    the amount of water this bonus provides
      */
-    public WaterBonus(
-            String name, boolean repeating,
-            Square position, int amount) {
-        super(name, "water", repeating, position);
+    public WaterBonus(String name, boolean repeating, Square position, int amount) {
+        super("water", repeating, position);
         this.amount = amount;
     }
 

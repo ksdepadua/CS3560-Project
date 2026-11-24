@@ -16,7 +16,7 @@ public class FoodBonus extends Item {
     public FoodBonus(
             String name, boolean repeating,
             Square position, int amount) {
-        super(name, "food", repeating, position);
+        super("food", repeating, position);
         this.amount = amount;
     }
 

@@ -1,85 +1,104 @@
 /**
- * Represents a trader that lives in a square on the map.
- * The player can propose trades (gold, water, food exchanges).
- * The trader can accept, counter-offer, or reject.
- * Traders are always repeating — available every turn.
+ * A trader living in a square on the map. Always repeating.
+ * All offers are from the PLAYER's point of view:
+ * "offered" = what the player gives, "requested" = what the player gets.
  */
-public abstract class Trader {
+public abstract class Trader extends Item {
 
-    protected Square position;
-    protected boolean repeating;
+    protected Offer offer;         // the trader's opening offer
+    private final int patience;    // counter-offers before walking away
+    private int rounds;            // counter-offers made in the current trade
 
     /**
-     * Constructs a Trader at the given square.
-     *
-     * @param position the square this trader is in
+     * @param position square this trader is in
+     * @param offer    the trader's opening offer
+     * @param patience number of counter-offers before the trader quits
      */
-    public Trader(Square position) {
-        this.position  = position;
-        this.repeating = true;
+    protected Trader(Square position, Offer offer, int patience) {
+        // Every trader is named "Trader" so the player can't tell types apart
+        super("Trader", true, position);
+        this.offer = offer;
+        this.patience = patience;
     }
 
+    // ---------- Methods from the class diagram ----------
+
     /**
-     * Evaluates the player's offer and decides to accept it.
-     * The offer represents what the PLAYER gives and receives.
-     * The trader accepts if the deal favors the trader.
+     * Decides whether to accept the player's offer.
      *
-     * @param offer the offer proposed by the player
+     * @param playerOffer the player's offer
      * @return true if the trader accepts
      */
-    public abstract boolean acceptOffer(Offer offer);
+    public abstract boolean acceptOffer(Offer playerOffer);
 
     /**
-     * Generates a counter-offer in response to the player's offer.
-     * Returns null if the trader refuses to negotiate further.
+     * Makes a counter-offer.
      *
-     * @param offer the offer proposed by the player
-     * @return a counter-offer, or null to reject entirely
+     * @param playerOffer the player's offer
+     * @return a new offer, or null if the trader walks away
      */
-    public abstract Offer counterOffer(Offer offer);
+    public abstract Offer counterOffer(Offer playerOffer);
 
     /**
-     * Generates the trader's opening offer to the player.
-     * This is what the trader wants in a standard trade.
+     * Returns the trader's opening offer.
      *
-     * @return the trader's initial offer
+     * @return opening offer
      */
-    public abstract Offer getOpeningOffer();
-
-    /**
-     * Returns the square this trader is in.
-     *
-     * @return position square
-     */
-    public Square getPosition() {
-        return position;
+    public Offer getOffer() {
+        return offer;              // Offer is immutable, so no copy needed
     }
 
-    /**
-     * Returns whether this trader is repeating.
-     *
-     * @return true (traders are always repeating)
-     */
-    public boolean isRepeating() {
-        return repeating;
+    // ---------- Helpers for subclasses ----------
+
+    /** Value of one unit of a resource to this trader. */
+    protected int weight(String resource) {
+        switch (resource) {
+            case "Gold":  return 3;
+            case "Water": return 2;
+            case "Food":  return 2;
+            default:      return 0;
+        }
     }
 
-    /**
-     * Calculates how favorable an offer is for the trader.
-     * Positive means the trader gains more than it gives.
-     *
-     * @param offer the offer to evaluate
-     * @return net value for the trader
-     */
-    protected int traderNetValue(Offer offer) {
-        int traderReceives =
-            offer.getOfferedGold()  +
-            offer.getOfferedWater() +
-            offer.getOfferedFood();
-        int traderGives =
-            offer.getRequestedGold()  +
-            offer.getRequestedWater() +
-            offer.getRequestedFood();
-        return traderReceives - traderGives;
+    /** Positive = trader comes out ahead. */
+    protected int traderNetValue(Offer o) {
+        int receives = o.getOfferedGold()  * weight("Gold")
+                     + o.getOfferedWater() * weight("Water")
+                     + o.getOfferedFood()  * weight("Food");
+        int gives    = o.getRequestedGold()  * weight("Gold")
+                     + o.getRequestedWater() * weight("Water")
+                     + o.getRequestedFood()  * weight("Food");
+        return receives - gives;
+    }
+
+    protected boolean outOfPatience() {
+        return rounds >= patience;
+    }
+
+    protected void countRound() {
+        rounds++;
+    }
+
+    protected void endTrade() {
+        rounds = 0;
+    }
+
+    // ---------- Item overrides ----------
+
+    /** A trader is never used up. */
+    @Override
+    public boolean collect() {
+        return true;
+    }
+
+    @Override
+    public void reset() {
+        super.reset();
+        endTrade();
+    }
+
+    @Override
+    public String toString() {
+        return "Trader";
     }
 }
