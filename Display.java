@@ -46,7 +46,7 @@ public class Display {
         System.out.println("     ||    oooooo'   oooooo'");
         System.out.println(RESET);
         System.out.println(
-            BOLD + "  Wilderness Survival System" + RESET
+            BOLD + "  Starving Games Simulator" + RESET
         );
         System.out.println();
     }
