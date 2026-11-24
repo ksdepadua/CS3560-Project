@@ -16,6 +16,7 @@ public class Display {
 
     /**
      * Clears the terminal screen and moves the cursor to the top-left.
+     * Buffered events are kept so they can be shown on the new screen.
      */
     public static void clearScreen() {
         System.out.print(
@@ -24,7 +25,6 @@ public class Display {
             + AnsiCodes.CLEAR_SCROLLBACK
         );
         System.out.flush();
-        events.clear();
     }
 
     /**

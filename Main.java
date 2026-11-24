@@ -41,6 +41,7 @@ public class Main {
         );
         System.out.print("  Enter choice (1-3): ");
         int choice = scanner.nextInt();
+        scanner.nextLine();     // consume the leftover Enter after nextInt
 
         Difficulty difficulty;
         switch (choice) {
@@ -53,14 +54,13 @@ public class Main {
         difficulty.setTrader();
 
         System.out.println();
-        Display.printEvent("Generating map...");
-        Display.pause(600);
+        System.out.println("  Generating map...");
 
         Game game = new Game();
         game.setDifficulty(difficulty);
         game.setSize(width, height);
         game.createPlayer();
-        game.run();
+        game.run(scanner);      // share the one Scanner
 
         scanner.close();
     }
