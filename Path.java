@@ -35,11 +35,7 @@ public class Path {
      * @param waterCost    water cost of the square entered
      * @param foodCost     food cost of the square entered
      */
-    public void addMove(
-            Direction direction,
-            int movementCost,
-            int waterCost,
-            int foodCost) {
+    public void addMove(Direction direction, int movementCost, int waterCost, int foodCost) {
         moves.add(direction);
         totalMovementCost += movementCost;
         totalWaterCost    += waterCost;
