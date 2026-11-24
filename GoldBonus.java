@@ -16,7 +16,7 @@ public class GoldBonus extends Item {
     public GoldBonus(
             String name, boolean repeating,
             Square position, int amount) {
-        super(name, "gold", repeating, position);
+        super("gold", repeating, position);
         this.amount = amount;
     }
 

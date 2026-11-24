@@ -48,6 +48,7 @@ public class Player {
         this.map             = map;
         this.col             = 0;
         this.row             = map.getHeight() / 2;
+        vision.updatePosition(row, col);
     }
 
     /**
@@ -64,41 +65,41 @@ public class Player {
         }
     }
 
+    // ---------- Trading ----------
+
     /**
-     * Conducts a trade negotiation with the given trader.
-     * The player accepts the trader's opening offer if it
-     * helps replenish a low resource; otherwise skips.
-     * Up to MAX_TRADE_ROUNDS of counter-offers are allowed.
+     * Negotiates with the given trader, following the Trader
+     * state diagram: the trader opens, the player either takes
+     * the deal or asks for more, and the trader accepts, counters,
+     * or walks away. Up to MAX_TRADE_ROUNDS rounds are allowed.
      *
      * @param trader the trader to negotiate with
      */
     public void conductTrade(Trader trader) {
         Display.printEvent("A trader is here!");
 
-        Offer traderOffer = trader.getOpeningOffer();
-        Display.printEvent("Trader offers: " + traderOffer);
+        Offer current = trader.getOffer();
+        Display.printEvent("Trader offers: " + current);
 
-        // Only trade if we can afford to give and need what
-        // we receive
-        int round = 0;
-        while (traderOffer != null && round < MAX_TRADE_ROUNDS) {
-            boolean canAfford = canAffordOffer(traderOffer);
-            boolean needsIt   = needsOfferGoods(traderOffer);
+        for (int round = 0;
+                current != null && round < MAX_TRADE_ROUNDS;
+                round++) {
 
-            if (canAfford && needsIt) {
-                // Player accepts the current offer
-                if (trader.acceptOffer(traderOffer)) {
-                    applyTrade(traderOffer);
-                    Display.printEvent("Trade accepted!");
-                    return;
-                }
+            // Can't pay what's on the table, so asking for more won't help
+            if (!canAffordOffer(current)) {
+                break;
             }
 
-            // Player proposes a counter-offer (ask for more)
-            Offer playerCounter = buildCounterOffer(traderOffer);
-            Display.printEvent(
-                "Player counter-offers: " + playerCounter
-            );
+            // 1. Take the current deal if it gives us something we need
+            if (needsOfferGoods(current) && trader.acceptOffer(current)) {
+                applyTrade(current);
+                Display.printEvent("Trade accepted!");
+                return;
+            }
+
+            // 2. Ask for a little more
+            Offer playerCounter = buildCounterOffer(current);
+            Display.printEvent("Player counter-offers: " + playerCounter);
 
             if (trader.acceptOffer(playerCounter)) {
                 applyTrade(playerCounter);
@@ -106,11 +107,16 @@ public class Player {
                 return;
             }
 
-            // Trader makes their own counter
-            traderOffer = trader.counterOffer(playerCounter);
-            round++;
+            // 3. Trader counters, or returns null and walks away
+            current = trader.counterOffer(playerCounter);
+            if (current == null) {
+                Display.printEvent("The trader got fed up and left.");
+            } else {
+                Display.printEvent("Trader counters: " + current);
+            }
         }
 
+        trader.endTrade();      // back to WaitingForPlayer for next visit
         Display.printEvent("No trade was made.");
     }
 
@@ -129,7 +135,7 @@ public class Player {
 
     /**
      * Returns true if the player actually needs what the
-     * offer provides (water, food, or gold is below half max).
+     * offer provides (water or food below half max, or gold).
      *
      * @param offer the offer to evaluate
      * @return true if the received goods are needed
@@ -150,28 +156,36 @@ public class Player {
      * Builds a counter-offer that asks for one extra unit
      * of whichever resource the player needs most.
      *
-     * @param traderOffer the trader's current offer
-     * @return a modified offer more favorable to the player
+     * @param offer the offer currently on the table
+     * @return a new offer more favorable to the player
      */
-    private Offer buildCounterOffer(Offer traderOffer) {
-        int extraWater = 0;
-        int extraFood  = 0;
-
+    private Offer buildCounterOffer(Offer offer) {
         if (currentWater < currentFood) {
-            extraWater = 1;
-        } else {
-            extraFood = 1;
+            return offer.withRequestedWater(offer.getRequestedWater() + 1);
         }
-
-        return new Offer(
-            traderOffer.getOfferedGold(),
-            traderOffer.getOfferedWater(),
-            traderOffer.getOfferedFood(),
-            traderOffer.getRequestedGold(),
-            traderOffer.getRequestedWater() + extraWater,
-            traderOffer.getRequestedFood()  + extraFood
-        );
+        return offer.withRequestedFood(offer.getRequestedFood() + 1);
     }
+
+    /**
+     * Applies a completed trade offer to the player's resources.
+     * The player pays the "offered" side and receives the
+     * "requested" side.
+     *
+     * @param offer the accepted trade offer
+     */
+    public void applyTrade(Offer offer) {
+        spend(0,
+            offer.getOfferedWater(),
+            offer.getOfferedFood(),
+            offer.getOfferedGold(), 0);
+        gain(0,
+            offer.getRequestedWater(),
+            offer.getRequestedFood(),
+            offer.getRequestedGold(), 0);
+        Display.printEvent("Trade applied: " + offer);
+    }
+
+    // ---------- Movement ----------
 
     /**
      * Moves the player one step in the given direction
@@ -212,6 +226,7 @@ public class Player {
 
         row = newRow;
         col = newCol;
+        vision.updatePosition(row, col);    // keep Vision in sync
         Display.printEvent(
             "Moved " + direction +
             " to (" + col + "," + row + ")"
@@ -250,47 +265,37 @@ public class Player {
             && currentFood     >= t.getFoodCost();
     }
 
+    // ---------- Items ----------
+
     /**
-     * Collects all available items in the given square.
+     * Collects all available bonus items in the given square.
+     * Traders are skipped here; takeTurn() handles them.
      *
      * @param square the square to collect from
      */
     public void collectItems(Square square) {
         List<Item> items = square.getItems();
         for (Item item : items) {
-            if (item.collect()) {
-                switch (item.getBonusType()) {
-                    case "food":
-                        gain(0, 0, item.getBonusAmount(), 0, 0);
-                        break;
-                    case "water":
-                        gain(0, item.getBonusAmount(), 0, 0, 0);
-                        break;
-                    case "gold":
-                        gain(0, 0, 0, item.getBonusAmount(), 0);
-                        break;
-                }
-                Display.printEvent("Collected: " + item);
+            if (item instanceof Trader) {
+                continue;
             }
+            if (!item.collect()) {
+                continue;               // already taken
+            }
+
+            int amount = item.getBonusAmount();
+            if (item instanceof FoodBonus) {
+                gain(0, 0, amount, 0, 0);
+            } else if (item instanceof WaterBonus) {
+                gain(0, amount, 0, 0, 0);
+            } else if (item instanceof GoldBonus) {
+                gain(0, 0, 0, amount, 0);
+            }
+            Display.printEvent("Collected: " + item);
         }
     }
 
-    /**
-     * Applies a completed trade offer to the player's resources.
-     *
-     * @param offer the accepted trade offer
-     */
-    public void applyTrade(Offer offer) {
-        spend(0,
-            offer.getOfferedWater(),
-            offer.getOfferedFood(),
-            offer.getOfferedGold(), 0);
-        gain(0,
-            offer.getRequestedWater(),
-            offer.getRequestedFood(),
-            offer.getRequestedGold(), 0);
-        Display.printEvent("Trade applied: " + offer);
-    }
+    // ---------- Resources ----------
 
     /**
      * Increases the player's current resource values.

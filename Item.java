@@ -7,7 +7,6 @@
 public class Item {
 
     private String name;
-    private String bonusType;
     private boolean repeating;
     private boolean taken;
     private Square position;
@@ -16,15 +15,11 @@ public class Item {
      * Constructs an Item with the given properties.
      *
      * @param name      the name of the item
-     * @param bonusType "food", "water", or "gold"
      * @param repeating whether collectible multiple times
      * @param position  the square this item is in
      */
-    public Item(
-            String name, String bonusType,
-            boolean repeating, Square position) {
+    public Item(String name, boolean repeating, Square position) {
         this.name      = name;
-        this.bonusType = bonusType;
         this.repeating = repeating;
         this.taken     = false;
         this.position  = position;
@@ -37,15 +32,6 @@ public class Item {
      */
     public String getName() {
         return name;
-    }
-
-    /**
-     * Returns the bonus type of this item.
-     *
-     * @return bonus type
-     */
-    public String getBonusType() {
-        return bonusType;
     }
 
     /**
@@ -111,7 +97,6 @@ public class Item {
 
     @Override
     public String toString() {
-        return name + " (" + bonusType +
-               (repeating ? ", repeating" : "") + ")";
+        return name + " (" + (repeating ? ", repeating" : "") + ")";
     }
 }
