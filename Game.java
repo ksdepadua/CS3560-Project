@@ -11,6 +11,7 @@ public class Game {
     private static final int MAX_TURNS = 2000;
 
     private Difficulty difficulty;
+    private Brain brain;          // chosen by the user; null = use difficulty's
     private Map map;
     private Player player;
     private int turn;
@@ -25,6 +26,16 @@ public class Game {
     }
 
     /**
+     * Sets the brain (strategy) the player will use.
+     * If never called, the difficulty's default brain is used.
+     *
+     * @param brain the chosen brain
+     */
+    public void setBrain(Brain brain) {
+        this.brain = brain;
+    }
+
+    /**
      * Creates the map using the selected difficulty.
      *
      * @param width  the width of the map
@@ -36,10 +47,13 @@ public class Game {
     }
 
     /**
-     * Creates the player with the brain from the difficulty.
+     * Creates the player with the chosen brain, or the
+     * difficulty's default brain if none was chosen.
      */
     public void createPlayer() {
-        Brain brain   = difficulty.getBrain();
+        if (brain == null) {
+            brain = difficulty.getBrain();
+        }
         Vision vision = new WideVision(map);
         player = new Player(20, 15, 15, vision, brain, map);
     }
