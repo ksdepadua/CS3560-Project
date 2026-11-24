@@ -46,9 +46,13 @@ public class Display {
 
     // ---------- Map ----------
 
+    /** Each map square is drawn 2 characters wide so it looks square. */
+    private static final int CELL_WIDTH = 2;
+
     /**
      * Draws the full game map with the player's position.
-     * Each terrain type has its own color and symbol.
+     * Terrain is drawn as solid colored blocks. Traders, items,
+     * and the player are drawn as a symbol on the terrain's color.
      *
      * @param map       the game map
      * @param playerRow the player's current row
@@ -64,7 +68,7 @@ public class Display {
                 if (y == playerRow && x == playerCol) {
                     System.out.print(
                         AnsiCodes.BOLD + AnsiCodes.BG_BLACK + AnsiCodes.CYAN
-                        + "@" + AnsiCodes.RESET
+                        + "@ " + AnsiCodes.RESET
                     );
                 } else {
                     System.out.print(getSquareDisplay(map.getSquare(x, y)));
@@ -78,35 +82,58 @@ public class Display {
     }
 
     /**
-     * Prints a horizontal map border like +-----+.
+     * Prints a horizontal map border like +----------+.
      *
-     * @param width the map width
+     * @param width the map width in squares
      */
     private static void printBorder(int width) {
-        System.out.println("  +" + "-".repeat(width) + "+");
+        System.out.println("  +" + "-".repeat(width * CELL_WIDTH) + "+");
     }
 
     /**
-     * Returns the colored single character for a square.
-     * Shows T for a trader, * for an uncollected item,
-     * and the terrain symbol otherwise.
+     * Returns the colored cell for a square: a symbol on the
+     * terrain color for a trader (T) or uncollected item (*),
+     * otherwise solid terrain blocks.
      *
      * @param sq the square to display
-     * @return colored single-character string
+     * @return colored 2-character cell
      */
     private static String getSquareDisplay(Square sq) {
         String terrain = sq.getTerrain().getTerrainName().toLowerCase();
-        String color   = terrainColor(terrain);
 
-        String symbol;
         if (sq.hasTrader()) {
-            symbol = "T";
-        } else if (hasUncollectedItem(sq)) {
-            symbol = "*";
-        } else {
-            symbol = terrainSymbol(terrain);
+            return symbolCell(terrain, "T");
         }
-        return color + symbol + AnsiCodes.RESET;
+        if (hasUncollectedItem(sq)) {
+            return symbolCell(terrain, "*");
+        }
+        return terrainBlock(terrain);
+    }
+
+    /**
+     * Returns a solid block cell in the terrain's color.
+     *
+     * @param terrain lowercase terrain name
+     * @return colored block cell
+     */
+    private static String terrainBlock(String terrain) {
+        return terrainColor(terrain)
+             + AnsiCodes.FULL_BLOCK.repeat(CELL_WIDTH)
+             + AnsiCodes.RESET;
+    }
+
+    /**
+     * Returns a cell showing a symbol on the terrain's background,
+     * so traders and items stand out but still show the terrain.
+     *
+     * @param terrain lowercase terrain name
+     * @param symbol  single character to show
+     * @return colored 2-character cell
+     */
+    private static String symbolCell(String terrain, String symbol) {
+        return terrainBackground(terrain) + AnsiCodes.BOLD
+             + symbolColor(terrain) + symbol + " "
+             + AnsiCodes.RESET;
     }
 
     /**
@@ -126,10 +153,10 @@ public class Display {
     }
 
     /**
-     * Returns the color used for a terrain type.
+     * Returns the block color used for a terrain type.
      *
      * @param terrain lowercase terrain name
-     * @return ANSI color code
+     * @return ANSI text color code
      */
     private static String terrainColor(String terrain) {
         switch (terrain) {
@@ -138,24 +165,41 @@ public class Display {
             case "desert":   return AnsiCodes.YELLOW;
             case "swamp":    return AnsiCodes.BLUE;
             case "mountain": return AnsiCodes.WHITE;
-            default:         return AnsiCodes.WHITE;
+            default:         return AnsiCodes.RED;    // unknown terrain stands out
         }
     }
 
     /**
-     * Returns the symbol used for a terrain type.
+     * Returns the background color matching a terrain's block color.
      *
      * @param terrain lowercase terrain name
-     * @return single-character symbol
+     * @return ANSI background color code
      */
-    private static String terrainSymbol(String terrain) {
+    private static String terrainBackground(String terrain) {
         switch (terrain) {
-            case "plains":   return ".";
-            case "forest":   return "F";
-            case "desert":   return "~";
-            case "swamp":    return "%";
-            case "mountain": return "^";
-            default:         return "?";
+            case "plains":   return AnsiCodes.BG_GREEN;
+            case "forest":   return AnsiCodes.BG_DARK_GREEN;
+            case "desert":   return AnsiCodes.BG_YELLOW;
+            case "swamp":    return AnsiCodes.BG_BLUE;
+            case "mountain": return AnsiCodes.BG_WHITE;
+            default:         return AnsiCodes.BG_BLACK;
+        }
+    }
+
+    /**
+     * Returns a text color that is readable on the terrain's
+     * background: white on dark colors, black on light ones.
+     *
+     * @param terrain lowercase terrain name
+     * @return ANSI text color code
+     */
+    private static String symbolColor(String terrain) {
+        switch (terrain) {
+            case "forest":
+            case "swamp":
+                return AnsiCodes.WHITE;
+            default:
+                return AnsiCodes.BLACK;
         }
     }
 
@@ -170,21 +214,25 @@ public class Display {
             + legendEntry("desert")
             + legendEntry("swamp")
             + legendEntry("mountain")
-            + "* item  T trader  "
-            + AnsiCodes.BOLD + AnsiCodes.CYAN + "@" + AnsiCodes.RESET + " you"
+        );
+        System.out.println(
+            "           "
+            + symbolCell("plains", "T") + " trader  "
+            + symbolCell("plains", "*") + " item  "
+            + AnsiCodes.BOLD + AnsiCodes.BG_BLACK + AnsiCodes.CYAN
+            + "@ " + AnsiCodes.RESET + " you"
         );
         System.out.println();
     }
 
     /**
-     * Builds one colored legend entry, e.g. "F forest  ".
+     * Builds one legend entry, e.g. a green block and "plains".
      *
      * @param terrain lowercase terrain name
      * @return legend text
      */
     private static String legendEntry(String terrain) {
-        return terrainColor(terrain) + terrainSymbol(terrain)
-             + AnsiCodes.RESET + " " + terrain + "  ";
+        return terrainBlock(terrain) + " " + terrain + "  ";
     }
 
     // ---------- Stats ----------
@@ -255,8 +303,8 @@ public class Display {
         boolean critical = (double) current / max < 0.3;
         String barColor  = critical ? lowColor : fullColor;
 
-        return "[" + barColor + "#".repeat(filled) + AnsiCodes.RESET
-             + ".".repeat(empty) + "]";
+        return "[" + barColor + AnsiCodes.FULL_BLOCK.repeat(filled)
+             + AnsiCodes.RESET + AnsiCodes.LIGHT_SHADE.repeat(empty) + "]";
     }
 
     // ---------- Events ----------
