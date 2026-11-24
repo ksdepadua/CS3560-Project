@@ -39,7 +39,7 @@ public class Display {
         System.out.println("     ||    oooooo'   oooooo'");
         System.out.println(AnsiCodes.RESET);
         System.out.println(
-            AnsiCodes.BOLD + "  Wilderness Survival System" + AnsiCodes.RESET
+            AnsiCodes.BOLD + "  Starving Games Simulator" + AnsiCodes.RESET
         );
         System.out.println();
     }
