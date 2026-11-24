@@ -85,3 +85,4 @@ All design diagrams are located in the `/diagrams` folder:
 
 - Michelle Lee
 - Keana De Padua
+- Angelina Liu
