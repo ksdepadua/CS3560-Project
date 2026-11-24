@@ -32,14 +32,9 @@ public class Display {
      */
     public static void printTitle() {
         System.out.println(AnsiCodes.BOLD + AnsiCodes.GREEN);
-        System.out.println("  oooo oooo  oooooo  oooooo ");
-        System.out.println("  `  W  W'  S'       S'     ");
-        System.out.println("    \\  /     `ooooo   `ooooo");
-        System.out.println("     ||           S'       S'");
-        System.out.println("     ||    oooooo'   oooooo'");
         System.out.println(AnsiCodes.RESET);
         System.out.println(
-            AnsiCodes.BOLD + "  Wilderness Survival System" + AnsiCodes.RESET
+            AnsiCodes.BOLD + "  Starving Games Simulator" + AnsiCodes.RESET
         );
         System.out.println();
     }
