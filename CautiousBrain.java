@@ -1,12 +1,15 @@
 /**
  * A cautious brain that prioritizes survival.
  * Seeks water first if low, then food, then a trader
- * if resources are needed, otherwise takes the
- * easiest path eastward.
+ * if resources are getting low. Rests to rebuild strength
+ * before it runs out, otherwise takes the cheapest step east.
  */
 public class CautiousBrain extends Brain {
 
     private static final int LOW_THRESHOLD = 3;
+
+    /** Rest when strength drops below this fraction of max. */
+    private static final double REST_BELOW = 0.4;
 
     /**
      * Makes a move based on a cautious survival strategy.
@@ -18,65 +21,42 @@ public class CautiousBrain extends Brain {
         Vision vision = player.getVision();
         vision.updatePosition(player.getRow(), player.getCol());
 
-        // Seek water if low
+        // 1. Seek water if low
         if (player.getCurrentWater() <= LOW_THRESHOLD) {
-            Path waterPath = vision.closestWater();
-            if (tryMove(player, waterPath)) return;
+            if (tryMove(player, vision.closestWater())) return;
         }
 
-        // Seek food if low
+        // 2. Seek food if low
         if (player.getCurrentFood() <= LOW_THRESHOLD) {
-            Path foodPath = vision.closestFood();
-            if (tryMove(player, foodPath)) return;
+            if (tryMove(player, vision.closestFood())) return;
         }
 
-        // Seek trader if both water and food are moderate
+        // 3. Seek a trader if water or food is getting low
         if (player.getCurrentWater() <= LOW_THRESHOLD + 1
                 || player.getCurrentFood() <= LOW_THRESHOLD + 1) {
-            Path traderPath = vision.closestTrader();
-            if (tryMove(player, traderPath)) return;
+            if (tryMove(player, vision.closestTrader())) return;
         }
 
-        // Always try to push east first
-        if (MapUtils.isSafeMove(player, Direction.EAST)) {
-            player.move(Direction.EAST);
+        // 4. Rest before strength runs out
+        double strengthRatio =
+            (double) player.getCurrentStrength() / player.getMaxStrength();
+        if (strengthRatio < REST_BELOW && canRestSafely(player)) {
+            player.rest();
             return;
         }
-        // Try diagonals that still move east
-        if (MapUtils.isSafeMove(player, Direction.NORTHEAST)) {
-            player.move(Direction.NORTHEAST);
-            return;
-        }
-        if (MapUtils.isSafeMove(player, Direction.SOUTHEAST)) {
-            player.move(Direction.SOUTHEAST);
-            return;
-        }
-        // East is blocked, take the easiest available move
-        Path easiest = vision.easiestPath();
-        if (tryMove(player, easiest)) return;
 
-        // Last resort: rest
+        // 5. Cheapest step east (E, NE, or SE)
+        if (moveEastCheapest(player)) return;
+
+        // 6. Blocked: rest to rebuild strength, or step around
+        if (player.getCurrentStrength() < player.getMaxStrength()
+                && canRestSafely(player)) {
+            player.rest();
+            return;
+        }
+        if (sidestep(player)) return;
+
+        // 7. Last resort
         player.rest();
-    }
-
-    /**
-     * Attempts to move the player along the first step of a path.
-     * Returns true if the move was made successfully.
-     *
-     * @param player the player to move
-     * @param path   the path to follow (may be null)
-     * @return true if move succeeded
-     */
-    private boolean tryMove(Player player, Path path) {
-        if (path == null || path.getPath().isEmpty()) {
-            return false;
-        }
-        Direction next = path.getPath().get(0);
-        Square nextSq  = MapUtils.getNextSquare(player, next);
-        if (nextSq != null && player.canEnter(nextSq)) {
-            player.move(next);
-            return true;
-        }
-        return false;
     }
 }

@@ -5,8 +5,9 @@ import java.util.Random;
  * Responsible for generating terrain and placing items
  * based on the selected difficulty.
  *
- * Terrain costs are balanced so a player with 20 strength,
- * 15 water, and 15 food can realistically cross the map.
+ * Terrain costs are balanced for a player who starts with
+ * 1.5x the map width in strength, water, and food
+ * (30 each on a 20-wide map; see Game.createPlayer).
  */
 public class Map {
 
@@ -21,7 +22,7 @@ public class Map {
     private static final Terrain MOUNTAIN =
         new Terrain("mountain", 3, 1, 2);
     private static final Terrain DESERT =
-        new Terrain("desert",   2, 3, 1);
+        new Terrain("desert",   2, 2, 1);
     private static final Terrain SWAMP =
         new Terrain("swamp",    2, 1, 2);
     private static final Terrain FOREST =

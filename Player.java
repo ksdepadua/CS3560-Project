@@ -251,8 +251,9 @@ public class Player {
     }
 
     /**
-     * Returns whether the player has enough resources
-     * to enter the given square.
+     * Returns whether the player can enter the given square
+     * and still have at least 1 strength, water, and food left.
+     * (Reaching 0 of anything counts as dead.)
      *
      * @param square the target square
      * @return true if the player can enter
@@ -260,9 +261,9 @@ public class Player {
     public boolean canEnter(Square square) {
         if (square == null) return false;
         Terrain t = square.getTerrain();
-        return currentStrength >= t.getMovementCost()
-            && currentWater    >= t.getWaterCost()
-            && currentFood     >= t.getFoodCost();
+        return currentStrength > t.getMovementCost()
+            && currentWater    > t.getWaterCost()
+            && currentFood     > t.getFoodCost();
     }
 
     // ---------- Items ----------

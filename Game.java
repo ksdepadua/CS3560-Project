@@ -10,6 +10,9 @@ public class Game {
 
     private static final int MAX_TURNS = 2000;
 
+    /** Starting strength/water/food per column of map width (30 on a 20-wide map). */
+    private static final double START_PER_COLUMN = 1.5;
+
     private Difficulty difficulty;
     private Brain brain;          // chosen by the user; null = use difficulty's
     private Map map;
@@ -49,13 +52,16 @@ public class Game {
     /**
      * Creates the player with the chosen brain, or the
      * difficulty's default brain if none was chosen.
+     * Starting strength, water, and food scale with the map
+     * width, since every column crossed costs resources.
      */
     public void createPlayer() {
         if (brain == null) {
             brain = difficulty.getBrain();
         }
         Vision vision = new WideVision(map);
-        player = new Player(20, 15, 15, vision, brain, map);
+        int start = (int) (map.getWidth() * START_PER_COLUMN);
+        player = new Player(start, start, start, vision, brain, map);
     }
 
     /**

@@ -1,10 +1,12 @@
 /**
  * A goal-oriented brain that pushes east as aggressively
- * as possible. Only detours for resources when critical.
+ * as possible. Only detours for resources when they get
+ * dangerously low, and only rests when it has to.
  */
 public class GoalOrientedBrain extends Brain {
 
-    private static final int CRITICAL = 1;
+    /** Detour for resources at or below this amount. */
+    private static final int CRITICAL = 3;
 
     /**
      * Makes a move based on a goal-oriented strategy.
@@ -16,63 +18,28 @@ public class GoalOrientedBrain extends Brain {
         Vision vision = player.getVision();
         vision.updatePosition(player.getRow(), player.getCol());
 
-        boolean waterCritical =
-            player.getCurrentWater() <= CRITICAL;
-        boolean foodCritical  =
-            player.getCurrentFood()  <= CRITICAL;
+        boolean waterCritical = player.getCurrentWater() <= CRITICAL;
+        boolean foodCritical  = player.getCurrentFood()  <= CRITICAL;
 
-        // Only detour if critically low
+        // 1. Only detour if critically low
         if (waterCritical || foodCritical) {
-            if (waterCritical) {
-                Path p = vision.closestWater();
-                if (tryMove(player, p)) return;
-            }
-            if (foodCritical) {
-                Path p = vision.closestFood();
-                if (tryMove(player, p)) return;
-            }
-            // Try a trader as last resort
-            Path p = vision.closestTrader();
-            if (tryMove(player, p)) return;
+            if (waterCritical && tryMove(player, vision.closestWater())) return;
+            if (foodCritical  && tryMove(player, vision.closestFood()))  return;
+            if (tryMove(player, vision.closestTrader())) return;
         }
 
-        // Push east, northeast, or southeast
-        if (MapUtils.isSafeMove(player, Direction.EAST)) {
-            player.move(Direction.EAST);
-            return;
-        }
-        if (MapUtils.isSafeMove(player, Direction.NORTHEAST)) {
-            player.move(Direction.NORTHEAST);
-            return;
-        }
-        if (MapUtils.isSafeMove(player, Direction.SOUTHEAST)) {
-            player.move(Direction.SOUTHEAST);
-            return;
-        }
+        // 2. Cheapest step east (E, NE, or SE)
+        if (moveEastCheapest(player)) return;
 
-        // Fall back to easiest available move
-        Path easiest = vision.easiestPath();
-        if (tryMove(player, easiest)) return;
+        // 3. Blocked: rest to rebuild strength, or step around
+        if (player.getCurrentStrength() < player.getMaxStrength()
+                && canRestSafely(player)) {
+            player.rest();
+            return;
+        }
+        if (sidestep(player)) return;
 
+        // 4. Last resort
         player.rest();
-    }
-
-    /**
-     * Attempts to move the player along the first step of a path.
-     *
-     * @param player the player to move
-     * @param path   the path to follow (may be null)
-     * @return true if move succeeded
-     */
-    private boolean tryMove(Player player, Path path) {
-        if (path == null || path.getPath().isEmpty()) {
-            return false;
-        }
-        Direction next = path.getPath().get(0);
-        if (MapUtils.isSafeMove(player, next)) {
-            player.move(next);
-            return true;
-        }
-        return false;
     }
 }
