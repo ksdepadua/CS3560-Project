@@ -3,22 +3,11 @@ import java.util.List;
 
 /**
  * Handles all terminal visual output for WSS.
- * Uses ANSI escape codes for colors and styling.
+ * Uses the ANSI escape codes in AnsiCodes for colors and styling.
  * Events are buffered each turn and printed together
  * below the stats, so the map only redraws once per turn.
  */
 public class Display {
-
-    // ANSI color codes
-    private static final String RESET  = "\u001B[0m";
-    private static final String BOLD   = "\u001B[1m";
-    private static final String RED    = "\u001B[31m";
-    private static final String GREEN  = "\u001B[32m";
-    private static final String YELLOW = "\u001B[33m";
-    private static final String BLUE   = "\u001B[34m";
-    private static final String CYAN   = "\u001B[36m";
-    private static final String WHITE  = "\u001B[37m";
-    private static final String BG_BLACK = "\u001B[40m";
 
     private static final int BAR_LENGTH = 10;
 
@@ -26,10 +15,14 @@ public class Display {
     private static final List<String> events = new ArrayList<>();
 
     /**
-     * Clears the terminal screen.
+     * Clears the terminal screen and moves the cursor to the top-left.
      */
     public static void clearScreen() {
-        System.out.print("\033[H\033[2J");
+        System.out.print(
+            AnsiCodes.CURSOR_HOME
+            + AnsiCodes.CLEAR_SCREEN
+            + AnsiCodes.CLEAR_SCROLLBACK
+        );
         System.out.flush();
         events.clear();
     }
@@ -38,120 +31,163 @@ public class Display {
      * Prints the WSS title banner.
      */
     public static void printTitle() {
-        System.out.println(BOLD + GREEN);
+        System.out.println(AnsiCodes.BOLD + AnsiCodes.GREEN);
         System.out.println("  oooo oooo  oooooo  oooooo ");
         System.out.println("  `  W  W'  S'       S'     ");
         System.out.println("    \\  /     `ooooo   `ooooo");
         System.out.println("     ||           S'       S'");
         System.out.println("     ||    oooooo'   oooooo'");
-        System.out.println(RESET);
+        System.out.println(AnsiCodes.RESET);
         System.out.println(
-            BOLD + "  Wilderness Survival System" + RESET
+            AnsiCodes.BOLD + "  Wilderness Survival System" + AnsiCodes.RESET
         );
         System.out.println();
     }
 
+    // ---------- Map ----------
+
     /**
      * Draws the full game map with the player's position.
      * Each terrain type has its own color and symbol.
-     * Uses compact single-char cells for readability.
      *
      * @param map       the game map
      * @param playerRow the player's current row
      * @param playerCol the player's current column
      */
     public static void drawMap(Map map, int playerRow, int playerCol) {
-        System.out.println(
-            BOLD + "  MAP  " + RESET +
-            GREEN  + "." + RESET + "=plains  " +
-            YELLOW + "~" + RESET + "=desert  " +
-            WHITE  + "^" + RESET + "=mountain  " +
-            BLUE   + "%" + RESET + "=swamp  " +
-            GREEN  + "F" + RESET + "=forest  " +
-            BOLD + CYAN + "@" + RESET + "=you  " +
-            "*=item  T=trader"
-        );
-        System.out.println();
-
-        // Top border
-        System.out.print("  +");
-        for (int x = 0; x < map.getWidth(); x++) {
-            System.out.print("-");
-        }
-        System.out.println("+");
+        printLegend();
+        printBorder(map.getWidth());
 
         for (int y = 0; y < map.getHeight(); y++) {
             System.out.print("  |");
             for (int x = 0; x < map.getWidth(); x++) {
-                Square sq = map.getSquare(x, y);
                 if (y == playerRow && x == playerCol) {
                     System.out.print(
-                        BOLD + BG_BLACK + CYAN + "@" + RESET
+                        AnsiCodes.BOLD + AnsiCodes.BG_BLACK + AnsiCodes.CYAN
+                        + "@" + AnsiCodes.RESET
                     );
                 } else {
-                    System.out.print(getTerrainDisplay(sq));
+                    System.out.print(getSquareDisplay(map.getSquare(x, y)));
                 }
             }
             System.out.println("|");
         }
 
-        // Bottom border
-        System.out.print("  +");
-        for (int x = 0; x < map.getWidth(); x++) {
-            System.out.print("-");
-        }
-        System.out.println("+");
+        printBorder(map.getWidth());
         System.out.println();
     }
 
     /**
-     * Returns the colored single character for a square's terrain.
-     * Shows T for trader, * for item, terrain char otherwise.
+     * Prints a horizontal map border like +-----+.
+     *
+     * @param width the map width
+     */
+    private static void printBorder(int width) {
+        System.out.println("  +" + "-".repeat(width) + "+");
+    }
+
+    /**
+     * Returns the colored single character for a square.
+     * Shows T for a trader, * for an uncollected item,
+     * and the terrain symbol otherwise.
      *
      * @param sq the square to display
-     * @return colored single character string
+     * @return colored single-character string
      */
-    private static String getTerrainDisplay(Square sq) {
-        String name = sq.getTerrain().getTerrainName().toLowerCase();
-        boolean hasItem   = !sq.getItems().isEmpty();
-        boolean hasTrader = sq.hasTrader();
+    private static String getSquareDisplay(Square sq) {
+        String terrain = sq.getTerrain().getTerrainName().toLowerCase();
+        String color   = terrainColor(terrain);
 
         String symbol;
-        String color;
-
-        switch (name) {
-            case "plains":
-                color  = GREEN;
-                symbol = hasTrader ? "T"
-                       : hasItem   ? "*" : ".";
-                break;
-            case "mountain":
-                color  = WHITE;
-                symbol = hasTrader ? "T"
-                       : hasItem   ? "*" : "^";
-                break;
-            case "desert":
-                color  = YELLOW;
-                symbol = hasTrader ? "T"
-                       : hasItem   ? "*" : "~";
-                break;
-            case "swamp":
-                color  = BLUE;
-                symbol = hasTrader ? "T"
-                       : hasItem   ? "*" : "%";
-                break;
-            case "forest":
-                color  = GREEN;
-                symbol = hasTrader ? "T"
-                       : hasItem   ? "*" : "F";
-                break;
-            default:
-                color  = WHITE;
-                symbol = "?";
+        if (sq.hasTrader()) {
+            symbol = "T";
+        } else if (hasUncollectedItem(sq)) {
+            symbol = "*";
+        } else {
+            symbol = terrainSymbol(terrain);
         }
-
-        return color + symbol + RESET;
+        return color + symbol + AnsiCodes.RESET;
     }
+
+    /**
+     * Returns true if the square has an item that hasn't been taken.
+     * Collected one-time items no longer show as *.
+     *
+     * @param sq the square to check
+     * @return true if an item is still available
+     */
+    private static boolean hasUncollectedItem(Square sq) {
+        for (Item item : sq.getItems()) {
+            if (!item.isTaken()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns the color used for a terrain type.
+     *
+     * @param terrain lowercase terrain name
+     * @return ANSI color code
+     */
+    private static String terrainColor(String terrain) {
+        switch (terrain) {
+            case "plains":   return AnsiCodes.GREEN;
+            case "forest":   return AnsiCodes.DARK_GREEN;
+            case "desert":   return AnsiCodes.YELLOW;
+            case "swamp":    return AnsiCodes.BLUE;
+            case "mountain": return AnsiCodes.WHITE;
+            default:         return AnsiCodes.WHITE;
+        }
+    }
+
+    /**
+     * Returns the symbol used for a terrain type.
+     *
+     * @param terrain lowercase terrain name
+     * @return single-character symbol
+     */
+    private static String terrainSymbol(String terrain) {
+        switch (terrain) {
+            case "plains":   return ".";
+            case "forest":   return "F";
+            case "desert":   return "~";
+            case "swamp":    return "%";
+            case "mountain": return "^";
+            default:         return "?";
+        }
+    }
+
+    /**
+     * Prints the map legend.
+     */
+    public static void printLegend() {
+        System.out.println(
+            "  " + AnsiCodes.BOLD + "LEGEND:" + AnsiCodes.RESET + "  "
+            + legendEntry("plains")
+            + legendEntry("forest")
+            + legendEntry("desert")
+            + legendEntry("swamp")
+            + legendEntry("mountain")
+            + "* item  T trader  "
+            + AnsiCodes.BOLD + AnsiCodes.CYAN + "@" + AnsiCodes.RESET + " you"
+        );
+        System.out.println();
+    }
+
+    /**
+     * Builds one colored legend entry, e.g. "F forest  ".
+     *
+     * @param terrain lowercase terrain name
+     * @return legend text
+     */
+    private static String legendEntry(String terrain) {
+        return terrainColor(terrain) + terrainSymbol(terrain)
+             + AnsiCodes.RESET + " " + terrain + "  ";
+    }
+
+    // ---------- Stats ----------
 
     /**
      * Draws the player's current resource stats as bars.
@@ -161,50 +197,43 @@ public class Display {
      */
     public static void drawStats(Player player, int turn) {
         System.out.println(
-            BOLD + "  -- Turn " + turn +
-            "  |  Goal: reach col " +
-            (player.getMap().getWidth() - 1) +
-            "  |  You are at col " + player.getCol() +
-            " --" + RESET
+            AnsiCodes.BOLD + "  -- Turn " + turn
+            + "  |  Goal: reach col " + (player.getMap().getWidth() - 1)
+            + "  |  You are at col " + player.getCol()
+            + " --" + AnsiCodes.RESET
         );
         System.out.println();
 
-        System.out.println(
-            "  " + BOLD + "STR " + RESET +
-            buildBar(
-                player.getCurrentStrength(),
-                player.getMaxStrength(), GREEN, RED
-            ) +
-            "  " + player.getCurrentStrength() +
-            "/" + player.getMaxStrength()
-        );
+        printStatBar("STR ", player.getCurrentStrength(),
+                     player.getMaxStrength(), AnsiCodes.GREEN);
+        printStatBar("H2O ", player.getCurrentWater(),
+                     player.getMaxWater(), AnsiCodes.CYAN);
+        printStatBar("FOOD", player.getCurrentFood(),
+                     player.getMaxFood(), AnsiCodes.YELLOW);
 
         System.out.println(
-            "  " + BOLD + "H2O " + RESET +
-            buildBar(
-                player.getCurrentWater(),
-                player.getMaxWater(), CYAN, RED
-            ) +
-            "  " + player.getCurrentWater() +
-            "/" + player.getMaxWater()
-        );
-
-        System.out.println(
-            "  " + BOLD + "FOOD" + RESET +
-            buildBar(
-                player.getCurrentFood(),
-                player.getMaxFood(), YELLOW, RED
-            ) +
-            "  " + player.getCurrentFood() +
-            "/" + player.getMaxFood()
-        );
-
-        System.out.println(
-            "  " + BOLD + "GOLD" + RESET +
-            " " + YELLOW + "* " +
-            player.getCurrentGold() + RESET
+            "  " + AnsiCodes.BOLD + "GOLD" + AnsiCodes.RESET
+            + " " + AnsiCodes.YELLOW + "* " + player.getCurrentGold()
+            + AnsiCodes.RESET
         );
         System.out.println();
+    }
+
+    /**
+     * Prints one labeled stat bar, e.g. "STR [#####.....]  5/10".
+     *
+     * @param label     4-character label
+     * @param current   current value
+     * @param max       maximum value
+     * @param fullColor color when not critically low
+     */
+    private static void printStatBar(
+            String label, int current, int max, String fullColor) {
+        System.out.println(
+            "  " + AnsiCodes.BOLD + label + AnsiCodes.RESET
+            + buildBar(current, max, fullColor, AnsiCodes.RED)
+            + "  " + current + "/" + max
+        );
     }
 
     /**
@@ -219,23 +248,18 @@ public class Display {
     private static String buildBar(
             int current, int max,
             String fullColor, String lowColor) {
-        int filled = (int) Math.round(
-            (double) current / max * BAR_LENGTH
-        );
+        int filled = (int) Math.round((double) current / max * BAR_LENGTH);
         filled = Math.max(0, Math.min(BAR_LENGTH, filled));
         int empty = BAR_LENGTH - filled;
 
         boolean critical = (double) current / max < 0.3;
         String barColor  = critical ? lowColor : fullColor;
 
-        StringBuilder bar = new StringBuilder("[");
-        bar.append(barColor);
-        for (int i = 0; i < filled; i++) bar.append("#");
-        bar.append(RESET);
-        for (int i = 0; i < empty; i++) bar.append(".");
-        bar.append("]");
-        return bar.toString();
+        return "[" + barColor + "#".repeat(filled) + AnsiCodes.RESET
+             + ".".repeat(empty) + "]";
     }
+
+    // ---------- Events ----------
 
     /**
      * Buffers a game event to be shown at end of turn.
@@ -244,52 +268,47 @@ public class Display {
      * @param message the event message
      */
     public static void printEvent(String message) {
-        events.add(CYAN + "> " + RESET + message);
+        events.add(AnsiCodes.CYAN + "> " + AnsiCodes.RESET + message);
     }
 
     /**
-     * Buffers a warning message.
+     * Buffers a successful event (such as a completed trade)
+     * in dark green.
+     *
+     * @param message the event message
+     */
+    public static void printSuccess(String message) {
+        events.add(AnsiCodes.DARK_GREEN + "> " + message + AnsiCodes.RESET);
+    }
+
+    /**
+     * Buffers a warning to be shown with this turn's events.
      *
      * @param message the warning
      */
     public static void printWarning(String message) {
-        System.out.println(
-            "  " + BOLD + RED + "! " + message + RESET
-        );
+        events.add(AnsiCodes.BOLD + AnsiCodes.RED + "! " + message
+                   + AnsiCodes.RESET);
     }
 
     /**
      * Prints all buffered events from this turn, then clears them.
      */
     public static void flushEvents() {
-        if (!events.isEmpty()) {
-            System.out.println(
-                BOLD + "  -- What happened --" + RESET
-            );
-            for (String e : events) {
-                System.out.println("  " + e);
-            }
-            events.clear();
-            System.out.println();
+        if (events.isEmpty()) {
+            return;
         }
-    }
-
-    /**
-     * Prints the map legend.
-     */
-    public static void printLegend() {
         System.out.println(
-            "  " + BOLD + "LEGEND:" + RESET +
-            "  " + GREEN + "." + RESET + " plains  " +
-            WHITE + "^" + RESET + " mountain  " +
-            YELLOW + "~" + RESET + " desert  " +
-            BLUE + "%" + RESET + " swamp  " +
-            GREEN + "F" + RESET + " forest  " +
-            "* item  T trader  " +
-            CYAN + "@" + RESET + " you"
+            AnsiCodes.BOLD + "  -- What happened --" + AnsiCodes.RESET
         );
+        for (String e : events) {
+            System.out.println("  " + e);
+        }
+        events.clear();
         System.out.println();
     }
+
+    // ---------- End screens ----------
 
     /**
      * Prints the win screen.
@@ -297,12 +316,7 @@ public class Display {
      * @param turns number of turns taken
      */
     public static void printWin(int turns) {
-        System.out.println();
-        System.out.println(BOLD + GREEN);
-        System.out.println("  +--------------------------------+");
-        System.out.println("  |  YOU ESCAPED THE WILDERNESS!  |");
-        System.out.println("  +--------------------------------+");
-        System.out.println(RESET);
+        printBanner(AnsiCodes.GREEN, "YOU ESCAPED THE WILDERNESS!");
         System.out.println("  Turns taken: " + turns);
         System.out.println();
     }
@@ -313,13 +327,28 @@ public class Display {
      * @param turns number of turns taken
      */
     public static void printGameOver(int turns) {
-        System.out.println();
-        System.out.println(BOLD + RED);
-        System.out.println("  +--------------------------------+");
-        System.out.println("  |          GAME  OVER           |");
-        System.out.println("  +--------------------------------+");
-        System.out.println(RESET);
+        printBanner(AnsiCodes.RED, "GAME  OVER");
         System.out.println("  You survived " + turns + " turns.");
+        System.out.println();
+    }
+
+    /**
+     * Prints a boxed, centered message in the given color.
+     *
+     * @param color   ANSI color code
+     * @param message text inside the box
+     */
+    private static void printBanner(String color, String message) {
+        final int innerWidth = 32;
+        int left  = (innerWidth - message.length()) / 2;
+        int right = innerWidth - message.length() - left;
+        String line = "  +" + "-".repeat(innerWidth) + "+";
+
+        System.out.println();
+        System.out.println(AnsiCodes.BOLD + color + line);
+        System.out.println("  |" + " ".repeat(left) + message
+                           + " ".repeat(right) + "|");
+        System.out.println(line + AnsiCodes.RESET);
         System.out.println();
     }
 
